@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -55,7 +56,7 @@ class GovernanceConfig:
     deny_threshold: float
     trust_settings: dict[str, float]
     compliance_frameworks: list[str]
-    raw: dict  # Original parsed YAML
+    raw: dict[str, Any]  # Original parsed YAML
     source_path: str  # File path this was loaded from
 
 
@@ -129,7 +130,7 @@ def load_config_from_string(content: str, source: str = "<string>") -> Governanc
     return parse_config(raw, source)
 
 
-def parse_config(raw: dict, source_path: str) -> GovernanceConfig:
+def parse_config(raw: dict[str, Any], source_path: str) -> GovernanceConfig:
     """Parse and validate a raw YAML dict into a GovernanceConfig."""
     errors: list[str] = []
 

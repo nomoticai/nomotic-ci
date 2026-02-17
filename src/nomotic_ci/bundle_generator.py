@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from nomotic_ci.config_loader import GovernanceConfig
 from nomotic_ci.config_validator import ValidationReport
@@ -32,10 +33,10 @@ class EvidenceBundle:
     config_source: str
     config_version: str
     compliance_frameworks: list[str]
-    validation_summary: dict
-    adversarial_summary: dict | None
-    drift_summary: dict | None
-    compound_authority_summary: dict | None
+    validation_summary: dict[str, Any]
+    adversarial_summary: dict[str, Any] | None
+    drift_summary: dict[str, Any] | None
+    compound_authority_summary: dict[str, Any] | None
     bundle_hash: str = ""
     bundle_path: str = ""
 

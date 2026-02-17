@@ -26,10 +26,10 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --tb=short --cov=src/nomotic_ci --cov-report=term-missing
+        run: python -m pytest tests/ -v --tb=short --cov=src/nomotic_ci --cov-report=term-missing
 
       - name: Run ruff linter
-        run: ruff check src/ tests/
+        run: python -m ruff check src/ tests/
 
       - name: Run mypy type checker
-        run: mypy src/nomotic_ci/
+        run: python -m mypy src/nomotic_ci/

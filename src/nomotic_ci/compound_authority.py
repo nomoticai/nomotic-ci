@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import combinations
+from typing import Any
 
 from nomotic import (
     Action,
@@ -81,8 +82,8 @@ class CompoundAuthorityReport:
     findings: list[CompoundAuthorityFinding] = field(default_factory=list)
     critical_count: int = 0
     warning_count: int = 0
-    cross_agent_risks: list[dict] = field(default_factory=list)
-    workflow_risks: list[dict] = field(default_factory=list)
+    cross_agent_risks: list[dict[str, Any]] = field(default_factory=list)
+    workflow_risks: list[dict[str, Any]] = field(default_factory=list)
     summary_text: str = ""
 
 
@@ -92,8 +93,8 @@ def analyze_compound_authority(config: GovernanceConfig) -> CompoundAuthorityRep
     Checks cross-agent scope assembly and per-agent workflow risks.
     """
     findings: list[CompoundAuthorityFinding] = []
-    cross_agent_risks: list[dict] = []
-    workflow_risks: list[dict] = []
+    cross_agent_risks: list[dict[str, Any]] = []
+    workflow_risks: list[dict[str, Any]] = []
 
     # Cross-agent analysis
     cross_findings, cross_risks = _analyze_cross_agent(config)
@@ -135,10 +136,10 @@ def analyze_compound_authority(config: GovernanceConfig) -> CompoundAuthorityRep
 
 def _analyze_cross_agent(
     config: GovernanceConfig,
-) -> tuple[list[CompoundAuthorityFinding], list[dict]]:
+) -> tuple[list[CompoundAuthorityFinding], list[dict[str, Any]]]:
     """Analyze every pair of agents for combined capability risks."""
     findings: list[CompoundAuthorityFinding] = []
-    risks: list[dict] = []
+    risks: list[dict[str, Any]] = []
 
     for agent_a, agent_b in combinations(config.agents, 2):
         shared_targets = set(agent_a.targets) & set(agent_b.targets)
@@ -190,14 +191,14 @@ def _analyze_cross_agent(
 
 def _analyze_workflows(
     config: GovernanceConfig,
-) -> tuple[list[CompoundAuthorityFinding], list[dict]]:
+) -> tuple[list[CompoundAuthorityFinding], list[dict[str, Any]]]:
     """Analyze per-agent workflow risks using GovernanceRuntime.
 
     Simulates multi-step workflows for each agent and checks for
     authority escalation patterns.
     """
     findings: list[CompoundAuthorityFinding] = []
-    risks: list[dict] = []
+    risks: list[dict[str, Any]] = []
 
     runtime = _build_runtime(config)
 
@@ -215,7 +216,8 @@ def _analyze_workflows(
         )
 
         # Simulate a workflow: execute all actions in sequence
-        verdicts = []
+        verdicts: list[dict[str, Any]] = []
+        ucs_values: list[float] = []
         for i, action_type in enumerate(actions_list):
             target = agent.targets[i % len(agent.targets)] if agent.targets else "default"
             action = Action(
@@ -230,11 +232,11 @@ def _analyze_workflows(
                 "verdict": verdict.verdict.name,
                 "ucs": verdict.ucs,
             })
+            ucs_values.append(verdict.ucs)
 
         # Check for escalation patterns:
         # If early actions are allowed but later ones have increasing UCS,
         # it could indicate an authority escalation pattern
-        ucs_values = [v["ucs"] for v in verdicts]
         if len(ucs_values) >= 3:
             # Check for monotonically increasing UCS (potential escalation)
             increasing = all(

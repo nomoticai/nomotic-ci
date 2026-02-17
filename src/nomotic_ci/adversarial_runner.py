@@ -7,7 +7,9 @@ governance config correctly blocks malicious or unauthorized actions.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from nomotic import (
     Action,
@@ -56,7 +58,7 @@ class AdversarialReport:
     scenarios_failed: int
     pass_rate: float
     results: list[ScenarioTestResult]
-    unexpected_allows: list[dict]
+    unexpected_allows: list[dict[str, Any]]
     summary_text: str
 
 
@@ -70,7 +72,7 @@ def run_adversarial_tests(config: GovernanceConfig) -> AdversarialReport:
     scenarios = _get_all_scenarios(config)
 
     results: list[ScenarioTestResult] = []
-    unexpected_allows: list[dict] = []
+    unexpected_allows: list[dict[str, Any]] = []
 
     for scenario_fn in scenarios:
         result = scenario_fn(runtime, config)
@@ -151,7 +153,9 @@ def _evaluate_action(
     )
 
 
-def _get_all_scenarios(config: GovernanceConfig):
+def _get_all_scenarios(
+    config: GovernanceConfig,
+) -> list[Callable[[GovernanceRuntime, GovernanceConfig], ScenarioTestResult]]:
     """Return all adversarial scenario test functions."""
     return [
         _scenario_privilege_escalation,
