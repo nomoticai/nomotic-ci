@@ -119,19 +119,19 @@ class TestBundleHash:
 
 
 class TestSanitization:
-    """Test sensitive data sanitization."""
+    """Test sensitive data sanitization using the library Sanitizer."""
 
     def test_email_sanitized(self):
         text = "owner is user@example.com for this agent"
         sanitized = _sanitize(text)
         assert "user@example.com" not in sanitized
-        assert "[EMAIL_REDACTED]" in sanitized
+        assert "[REDACTED" in sanitized
 
     def test_github_token_sanitized(self):
         text = "token: ghp_abcdefghijklmnopqrstuvwxyz1234567890"
         sanitized = _sanitize(text)
         assert "ghp_" not in sanitized
-        assert "[GITHUB_TOKEN_REDACTED]" in sanitized
+        assert "[REDACTED" in sanitized
 
     def test_api_key_sanitized(self):
         text = "api key: sk-12345678901234567890123456789012"
@@ -230,3 +230,21 @@ class TestBundleContents:
             assert "bundle_id" in data
             assert "timestamp" in data
             assert "config_version" in data
+
+    def test_contains_compliance_mappings(self):
+        config = _load(_basic_config_dict())
+        report = validate(config)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = generate_bundle(
+                config=config,
+                validation_report=report,
+                compliance_frameworks=["SOC2"],
+                bundle_dir=tmpdir,
+            )
+            with open(bundle.bundle_path) as f:
+                data = json.load(f)
+            assert "compliance_control_mappings" in data
+            assert len(data["compliance_control_mappings"]) > 0
+            # SOC2 mappings should include CC6.1 etc.
+            control_ids = [m["control_id"] for m in data["compliance_control_mappings"]]
+            assert "CC6.1" in control_ids

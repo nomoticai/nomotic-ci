@@ -2,6 +2,10 @@
 
 Goes beyond schema validation to check logical consistency, security
 properties, and runtime behavior using Nomotic's GovernanceRuntime.
+
+The simulation check now delegates to ``build_sandbox_runtime`` from the
+library's sandbox module, which correctly sets up per-agent scope and
+boundary enforcement via ``apply_config_to_runtime``.
 """
 
 from __future__ import annotations
@@ -15,7 +19,10 @@ from nomotic import (
     TrustProfile,
     Verdict,
 )
-from nomotic.runtime import RuntimeConfig
+from nomotic.sandbox import (
+    AgentConfig as SandboxAgentConfig,
+    build_sandbox_runtime,
+)
 
 from nomotic_ci.config_loader import GovernanceConfig
 
@@ -315,24 +322,28 @@ def _check_compliance_dimensions(config: GovernanceConfig) -> list[ValidationIss
 def _check_simulation(config: GovernanceConfig) -> list[ValidationIssue]:
     """Simulate governance decisions to verify the config produces expected verdicts.
 
-    Instantiates a GovernanceRuntime with the config, sets up agent scopes,
-    and tests that out-of-scope actions are denied.
+    Uses ``build_sandbox_runtime`` from the library sandbox module to create
+    a properly-configured runtime per agent, then tests that out-of-scope
+    actions are denied and in-scope actions are allowed.
     """
     issues: list[ValidationIssue] = []
 
     if not config.agents:
         return issues
 
-    runtime_config = RuntimeConfig(
-        allow_threshold=config.allow_threshold,
-        deny_threshold=config.deny_threshold,
-    )
-    runtime = GovernanceRuntime(config=runtime_config)
+    agent = config.agents[0]
 
-    # Configure dimensions
+    # Build a sandbox runtime for the first agent
+    sandbox_config = SandboxAgentConfig(
+        agent_id=agent.agent_id,
+        actions=sorted(agent.scope),
+        boundaries=agent.boundaries,
+    )
+    runtime = build_sandbox_runtime(agent_config=sandbox_config, agent_id=agent.agent_id)
+
+    # Apply dimension weights and vetoes from the governance config
     _configure_runtime(runtime, config)
 
-    agent = config.agents[0]
     context = AgentContext(
         agent_id=agent.agent_id,
         trust_profile=TrustProfile(
@@ -393,7 +404,10 @@ def _check_simulation(config: GovernanceConfig) -> list[ValidationIssue]:
 def _configure_runtime(runtime: GovernanceRuntime, config: GovernanceConfig) -> None:
     """Configure a GovernanceRuntime from a GovernanceConfig.
 
-    Sets dimension weights, veto flags, agent scopes, and boundaries.
+    Sets dimension weights and veto flags using the runtime's public API.
+    Per-agent scopes and boundaries are handled by ``build_sandbox_runtime``
+    when creating the runtime, so this function only needs to apply dimension
+    weights and veto flags.
     """
     for dim in runtime.registry.dimensions:
         # Set weights
@@ -402,14 +416,3 @@ def _configure_runtime(runtime: GovernanceRuntime, config: GovernanceConfig) -> 
 
         # Set veto flags
         dim.can_veto = dim.name in config.veto_dimensions
-
-    # Configure agent scopes and boundaries
-    scope_dim = runtime.registry.get("scope_compliance")
-    isolation_dim = runtime.registry.get("isolation_integrity")
-
-    for agent in config.agents:
-        if scope_dim is not None and hasattr(scope_dim, "configure_agent_scope"):
-            scope_dim.configure_agent_scope(agent.agent_id, agent.scope)
-
-        if isolation_dim is not None and hasattr(isolation_dim, "set_boundaries"):
-            isolation_dim.set_boundaries(agent.agent_id, agent.boundaries)

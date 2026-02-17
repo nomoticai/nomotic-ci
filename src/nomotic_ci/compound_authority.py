@@ -3,24 +3,33 @@
 Detects situations where individually-safe agent scopes combine to create
 unsafe compound capabilities, either across agents or within a single agent's
 multi-step workflows.
+
+Cross-agent analysis uses pair-wise scope comparison against known dangerous
+capability combinations.  Workflow analysis delegates to the library's
+WorkflowGovernor which detects cumulative risk, ordering concerns, compound
+authority chains, and behavioral drift across steps.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any
 
-from nomotic import (
-    Action,
-    AgentContext,
-    GovernanceRuntime,
-    TrustProfile,
+from nomotic import Action, AgentContext, TrustProfile
+from nomotic.context_profile import (
+    CompletedStep,
+    ContextProfile,
+    WorkflowContext,
 )
-from nomotic.runtime import RuntimeConfig
+from nomotic.sandbox import (
+    AgentConfig as SandboxAgentConfig,
+    build_sandbox_runtime,
+)
+from nomotic.workflow_governor import WorkflowGovernor, WorkflowGovernorConfig
 
 from nomotic_ci.config_loader import GovernanceConfig
-from nomotic_ci.config_validator import _configure_runtime
 
 
 # Known dangerous capability combinations
@@ -101,7 +110,7 @@ def analyze_compound_authority(config: GovernanceConfig) -> CompoundAuthorityRep
     findings.extend(cross_findings)
     cross_agent_risks.extend(cross_risks)
 
-    # Per-agent workflow analysis
+    # Per-agent workflow analysis using library WorkflowGovernor
     wf_findings, wf_risks = _analyze_workflows(config)
     findings.extend(wf_findings)
     workflow_risks.extend(wf_risks)
@@ -192,21 +201,37 @@ def _analyze_cross_agent(
 def _analyze_workflows(
     config: GovernanceConfig,
 ) -> tuple[list[CompoundAuthorityFinding], list[dict[str, Any]]]:
-    """Analyze per-agent workflow risks using GovernanceRuntime.
+    """Analyze per-agent workflow risks using the library WorkflowGovernor.
 
     Simulates multi-step workflows for each agent and checks for
-    authority escalation patterns.
+    compound authority flags, ordering concerns, and risk escalation.
     """
     findings: list[CompoundAuthorityFinding] = []
     risks: list[dict[str, Any]] = []
 
-    runtime = _build_runtime(config)
+    governor = WorkflowGovernor(WorkflowGovernorConfig(
+        compound_authority_detection=True,
+        ordering_analysis=True,
+        consequence_projection=False,  # not needed for static analysis
+        drift_across_steps_detection=True,
+    ))
 
     for agent in config.agents:
         if len(agent.scope) < 2:
             continue
 
         actions_list = sorted(agent.scope)
+
+        # Build a sandbox runtime for this agent
+        sandbox_config = SandboxAgentConfig(
+            agent_id=agent.agent_id,
+            actions=actions_list,
+            boundaries=agent.boundaries,
+        )
+        runtime = build_sandbox_runtime(agent_config=sandbox_config, agent_id=agent.agent_id)
+
+        # Build completed steps by simulating each action through the runtime
+        completed_steps: list[CompletedStep] = []
         context = AgentContext(
             agent_id=agent.agent_id,
             trust_profile=TrustProfile(
@@ -215,9 +240,8 @@ def _analyze_workflows(
             ),
         )
 
-        # Simulate a workflow: execute all actions in sequence
-        verdicts: list[dict[str, Any]] = []
-        ucs_values: list[float] = []
+        now = datetime.now(timezone.utc).isoformat()
+
         for i, action_type in enumerate(actions_list):
             target = agent.targets[i % len(agent.targets)] if agent.targets else "default"
             action = Action(
@@ -226,30 +250,71 @@ def _analyze_workflows(
                 target=target,
             )
             verdict = runtime.evaluate(action, context)
-            verdicts.append({
-                "action_type": action_type,
-                "target": target,
-                "verdict": verdict.verdict.name,
-                "ucs": verdict.ucs,
-            })
-            ucs_values.append(verdict.ucs)
+            completed_steps.append(CompletedStep(
+                step_id=f"step-{i + 1}",
+                step_number=i + 1,
+                method=action_type,
+                target=target,
+                verdict=verdict.verdict.name,
+                ucs=verdict.ucs,
+                timestamp=now,
+            ))
 
-        # Check for escalation patterns:
-        # If early actions are allowed but later ones have increasing UCS,
-        # it could indicate an authority escalation pattern
+        # Build workflow context and context profile for the governor
+        workflow = WorkflowContext(
+            workflow_id=f"wf-{agent.agent_id}",
+            workflow_type="compound_authority_analysis",
+            current_step=len(completed_steps),
+            total_steps=len(completed_steps),
+            steps_completed=completed_steps,
+            steps_remaining=[],
+        )
+        profile = ContextProfile(
+            profile_id=f"profile-{agent.agent_id}",
+            agent_id=agent.agent_id,
+            profile_type="workflow_analysis",
+            workflow=workflow,
+        )
+
+        # Assess workflow
+        assessment = governor.assess_workflow(f"wf-{agent.agent_id}", profile)
+
+        # Convert compound authority flags to findings
+        for flag in assessment.compound_authority_flags:
+            findings.append(CompoundAuthorityFinding(
+                severity=flag.severity if flag.severity in ("critical", "warning") else "info",
+                agents_involved=[agent.agent_id],
+                capabilities_combined=flag.methods_chained,
+                resulting_capability=flag.resulting_capability,
+                description=(
+                    f"Agent '{agent.agent_id}' workflow: {flag.description}"
+                ),
+                mitigation=(
+                    "Review the action sequence and consider whether "
+                    "sequential execution should be governed as a compound operation."
+                ),
+            ))
+
+        # Convert risk factors to workflow risks
+        if assessment.risk_factors or assessment.compound_authority_flags:
+            risk_entry: dict[str, Any] = {
+                "agent": agent.agent_id,
+                "cumulative_risk": assessment.cumulative_risk_score,
+                "risk_trajectory": assessment.risk_trajectory,
+                "recommendation": assessment.recommendation,
+                "risk_factors": [f.to_dict() for f in assessment.risk_factors],
+                "compound_flags": [f.to_dict() for f in assessment.compound_authority_flags],
+            }
+            risks.append(risk_entry)
+
+        # Check for escalation pattern via UCS values
+        ucs_values = [s.ucs for s in completed_steps]
         if len(ucs_values) >= 3:
-            # Check for monotonically increasing UCS (potential escalation)
             increasing = all(
                 ucs_values[i] <= ucs_values[i + 1]
                 for i in range(len(ucs_values) - 1)
             )
             if increasing and ucs_values[-1] > ucs_values[0] + 0.1:
-                risk = {
-                    "agent": agent.agent_id,
-                    "workflow": verdicts,
-                    "pattern": "authority_escalation",
-                }
-                risks.append(risk)
                 findings.append(CompoundAuthorityFinding(
                     severity="info",
                     agents_involved=[agent.agent_id],
@@ -298,14 +363,3 @@ def _analyze_single_agent_compounds(
                 ))
 
     return findings
-
-
-def _build_runtime(config: GovernanceConfig) -> GovernanceRuntime:
-    """Build a GovernanceRuntime from a GovernanceConfig."""
-    runtime_config = RuntimeConfig(
-        allow_threshold=config.allow_threshold,
-        deny_threshold=config.deny_threshold,
-    )
-    runtime = GovernanceRuntime(config=runtime_config)
-    _configure_runtime(runtime, config)
-    return runtime

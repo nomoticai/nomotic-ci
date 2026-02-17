@@ -4,6 +4,10 @@ Creates a structured evidence package documenting what governance rules changed,
 what validation was performed, what adversarial tests were run, and what the
 results were. This is the 'governed adaptation' concept — governance changes
 are themselves governed and evidenced.
+
+Delegates to the library's ``Sanitizer`` for sensitive-data redaction and
+uses the library's compliance framework mappings (SOC2, HIPAA, PCI-DSS,
+ISO 27001) to tag bundles with the relevant control references.
 """
 
 from __future__ import annotations
@@ -11,17 +15,19 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from nomotic.evidence import get_mappings_for_frameworks
+from nomotic.sanitize import SanitizationPolicy, Sanitizer
+
+from nomotic_ci.adversarial_runner import AdversarialReport
+from nomotic_ci.compound_authority import CompoundAuthorityReport
 from nomotic_ci.config_loader import GovernanceConfig
 from nomotic_ci.config_validator import ValidationReport
-from nomotic_ci.adversarial_runner import AdversarialReport
 from nomotic_ci.drift_checker import DriftReport
-from nomotic_ci.compound_authority import CompoundAuthorityReport
 
 
 @dataclass
@@ -41,13 +47,16 @@ class EvidenceBundle:
     bundle_path: str = ""
 
 
-# Patterns for sensitive data sanitization — specific patterns first, generic last
-SENSITIVE_PATTERNS = [
-    (re.compile(r"ghp_[a-zA-Z0-9]{36}"), "[GITHUB_TOKEN_REDACTED]"),
-    (re.compile(r"sk-[a-zA-Z0-9]{32,}"), "[API_KEY_REDACTED]"),
-    (re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"), "[EMAIL_REDACTED]"),
-    (re.compile(r"(?i)(password|secret|token|key)\s*[:=]\s*(?!\[)(\S+)"), r"\1: [REDACTED]"),
-]
+# Library sanitizer configured with CI-specific sensitive patterns
+_CI_SANITIZATION_POLICY = SanitizationPolicy(
+    enabled=True,
+    sensitive_value_patterns=[
+        r"ghp_[a-zA-Z0-9]{36}",
+        r"sk-[a-zA-Z0-9]{32,}",
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+    ],
+)
+_sanitizer = Sanitizer(_CI_SANITIZATION_POLICY)
 
 
 def generate_bundle(
@@ -157,6 +166,10 @@ def generate_bundle(
             ],
         }
 
+    # Add compliance control mappings from the library
+    lib_mappings = get_mappings_for_frameworks(frameworks if frameworks else None)
+    compliance_mappings = [m.to_dict() for m in lib_mappings]
+
     bundle = EvidenceBundle(
         bundle_id=bundle_id,
         timestamp=now.isoformat(),
@@ -170,12 +183,13 @@ def generate_bundle(
     )
 
     # Serialize to JSON
-    bundle_data = {
+    bundle_data: dict[str, Any] = {
         "bundle_id": bundle.bundle_id,
         "timestamp": bundle.timestamp,
         "config_source": bundle.config_source,
         "config_version": bundle.config_version,
         "compliance_frameworks": bundle.compliance_frameworks,
+        "compliance_control_mappings": compliance_mappings,
         "validation": bundle.validation_summary,
         "adversarial_testing": bundle.adversarial_summary,
         "drift_detection": bundle.drift_summary,
@@ -206,7 +220,5 @@ def generate_bundle(
 
 
 def _sanitize(text: str) -> str:
-    """Sanitize sensitive data from the bundle text."""
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        text = pattern.sub(replacement, text)
-    return text
+    """Sanitize sensitive data from the bundle text using the library Sanitizer."""
+    return _sanitizer.sanitize_string(text)
