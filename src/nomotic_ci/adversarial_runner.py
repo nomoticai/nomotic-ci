@@ -14,7 +14,6 @@ from nomotic import (
     AgentContext,
     GovernanceRuntime,
     TrustProfile,
-    Verdict,
 )
 from nomotic.runtime import RuntimeConfig
 

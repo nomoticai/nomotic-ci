@@ -52,7 +52,6 @@ def _load(data: dict):
 def _check_with_baseline(current_data: dict, baseline_data: dict) -> DriftReport:
     """Run drift check with a mocked baseline."""
     current = _load(current_data)
-    baseline_yaml = yaml.dump(baseline_data)
 
     with patch("nomotic_ci.drift_checker._load_baseline") as mock_load:
         mock_load.return_value = _load(baseline_data)

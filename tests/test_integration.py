@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import yaml
 
-from nomotic_ci.config_loader import load_config_from_string, VALID_DIMENSIONS
+from nomotic_ci.config_loader import load_config_from_string
 from nomotic_ci.config_validator import validate
 from nomotic_ci.adversarial_runner import run_adversarial_tests
 from nomotic_ci.drift_checker import check_drift

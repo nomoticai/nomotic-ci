@@ -10,8 +10,6 @@ import yaml
 
 from nomotic_ci.config_loader import (
     ConfigError,
-    GovernanceConfig,
-    find_config_file,
     load_config,
     load_config_from_string,
     VALID_DIMENSIONS,

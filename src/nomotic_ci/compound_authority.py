@@ -18,7 +18,7 @@ from nomotic import (
 )
 from nomotic.runtime import RuntimeConfig
 
-from nomotic_ci.config_loader import AgentConfig, GovernanceConfig
+from nomotic_ci.config_loader import GovernanceConfig
 from nomotic_ci.config_validator import _configure_runtime
 
 

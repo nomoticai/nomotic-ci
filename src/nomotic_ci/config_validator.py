@@ -148,8 +148,8 @@ def _check_threshold_inversion(config: GovernanceConfig) -> list[ValidationIssue
             ),
             location="thresholds",
             remediation=(
-                f"Set allow_threshold > deny_threshold. "
-                f"Example: allow: 0.7, deny: 0.3"
+                "Set allow_threshold > deny_threshold. "
+                "Example: allow: 0.7, deny: 0.3"
             ),
         )]
     return []
@@ -189,7 +189,7 @@ def _check_missing_critical_vetoes(config: GovernanceConfig) -> list[ValidationI
                     f"'{dim}' has weight {weight} but no veto authority. An agent could score "
                     f"low on {dim} but still pass via high scores in other dimensions."
                 ),
-                location=f"dimensions.vetoes",
+                location="dimensions.vetoes",
                 remediation=f"Consider adding '{dim}' to dimensions.vetoes.",
             ))
     return issues

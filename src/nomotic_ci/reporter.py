@@ -51,7 +51,7 @@ def format_pr_comment(
     )
 
     sections = []
-    sections.append(f"## \U0001f6e1\ufe0f Nomotic Governance Validation\n")
+    sections.append("## \U0001f6e1\ufe0f Nomotic Governance Validation\n")
     sections.append(f"**Status**: {status_icon} {status_label}\n")
 
     # Validation section
