@@ -1,10 +1,10 @@
 # Nomotic CI — Governance Validation for CI/CD
 
-**Nomotic CI validates your AI governance rules. It does not review code.**
+[![CI](https://github.com/NomoticAI/nomotic-ci/actions/workflows/ci.yml/badge.svg)](https://github.com/NomoticAI/nomotic-ci/actions/workflows/ci.yml)
 
-If you need code review governance, see [CodeGuard](https://github.com/DNYoussef/codeguard-action).
-If you need runtime agent governance, see [Nomotic](https://github.com/NomoticAI/Nomotic).
-If you need to ensure your governance configurations are safe before deploying them, you're in the right place.
+**nomotic-ci validates your AI governance rules before they reach production.**
+
+For runtime agent governance, see [Nomotic](https://github.com/NomoticAI/Nomotic).
 
 ## What It Does
 
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed for drift detection
+          fetch-depth: 0  # Full history needed for drift detection against baseline
 
       - uses: NomoticAI/nomotic-ci@v1
         with:
@@ -121,16 +121,16 @@ See the `examples/` directory for fintech and healthcare configurations.
 
 ### Adversarial Testing
 
-Runs six adversarial scenarios against the config using Nomotic's governance runtime:
+Runs six attack scenarios per agent against the config using Nomotic's governance runtime:
 
 | Scenario | What It Tests |
 |----------|---------------|
+| Prompt Injection Resistance | Injected instructions attempting to bypass governance |
 | Privilege Escalation | Agents attempt actions outside their scope |
-| Scope Assembly | Cross-agent privilege combination |
-| Boundary Probing | In-scope actions on out-of-boundary targets |
+| Drift Inducement | Gradual behavioral shifts to erode governance boundaries |
 | Trust Manipulation | Low-trust agents attempt unauthorized actions |
-| Action Type Abuse | Dangerous action types not in scope |
-| Cross-Agent Impersonation | Unregistered agents on real targets |
+| Confused Deputy | Cross-agent privilege confusion and delegation abuse |
+| Boundary Probing | In-scope actions on out-of-boundary targets |
 
 ### Drift Detection
 
@@ -152,6 +152,48 @@ Detects when individually-safe agent scopes combine to create unsafe capabilitie
 - **Cross-agent**: Agent A reads + Agent B writes on shared target = effective update
 - **Single-agent**: Agent has read + write + delete = full data lifecycle control
 - **Workflow**: Sequential action patterns that escalate authority
+
+## Example PR Comment
+
+When a PR modifies governance rules, Nomotic CI posts a comment like this:
+
+```markdown
+## 🛡️ Nomotic Governance Validation
+
+**Status**: ✅ Pass
+
+### Configuration Validation
+| Check | Status | Details |
+|-------|--------|---------|
+| Schema validation | ✅ | Valid nomotic.yaml |
+| Threshold consistency | ✅ | allow (0.7) > deny (0.3) |
+| Scope security | ⚠️ | Agent `trading-agent` has broad scope (4 action types) |
+| Simulation check | ✅ | Out-of-scope actions correctly denied |
+
+### Adversarial Testing
+**Pass rate: 12/12 (100%)**
+
+| Scenario | Result | Details |
+|----------|--------|---------|
+| Prompt Injection Resistance | ✅ | All injection attempts blocked |
+| Privilege Escalation | ✅ | All escalation attempts blocked |
+| Drift Inducement | ✅ | Drift correctly flagged |
+| Trust Manipulation | ✅ | Trust manipulation blocked |
+| Confused Deputy | ✅ | Deputy attacks handled |
+| Boundary Probing | ✅ | All boundary probes handled |
+
+### Configuration Drift
+| Change | Severity | Details |
+|--------|----------|---------|
+| `agents.trading-agent.scope.actions` | ⚠️ Warning | Added `reconcile` action |
+| `thresholds.allow` | ℹ️ Info | Changed 0.75 → 0.80 (stricter) |
+
+### Compound Authority
+No compound authority vulnerabilities detected.
+
+---
+*Validated by Nomotic CI v0.1.0*
+```
 
 ## Inputs
 
@@ -192,20 +234,29 @@ When `evidence_bundle: 'true'`, Nomotic CI generates a JSON evidence package doc
 - What checks were performed and their results
 - What adversarial tests were run
 - What drift was detected
-- Compliance framework tagging (SOC2, HIPAA, PCI-DSS, ISO27001)
+- Compliance framework mappings (SOC2, HIPAA, PCI-DSS, ISO27001)
 
-Bundles are written to `bundle_dir` and can be archived as build artifacts.
+Archive bundles as build artifacts for compliance retention:
 
-## Relationship to Nomotic
+```yaml
+      - uses: NomoticAI/nomotic-ci@v1
+        with:
+          evidence_bundle: 'true'
+          compliance_frameworks: 'SOC2,HIPAA'
 
-Nomotic CI uses the [Nomotic](https://github.com/NomoticAI/Nomotic) library (`pip install nomotic`) as its governance runtime. Nomotic provides:
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: governance-evidence
+          path: .nomotic/bundles/
+          retention-days: 2555  # 7 years for compliance
+```
 
-- The 13-dimension governance evaluation framework
-- The three-tier evaluation pipeline (veto gate, weighted scoring, deliberation)
-- Trust calibration and UCS (Unified Confidence Score) computation
-- Agent scope and boundary enforcement
+## Requirements
 
-Nomotic CI adds CI/CD-specific capabilities on top: configuration validation, adversarial testing, drift detection, compound authority analysis, and evidence bundle generation.
+- Requires `nomotic>=0.2.0` ([PyPI](https://pypi.org/project/nomotic/))
+- Python 3.11+
+- Docker-based GitHub Action — no local installation needed
 
 ## License
 
