@@ -1,0 +1,65 @@
+version: "1.0"
+
+agents:
+  trading-agent:
+    scope:
+      actions: [read, query, transfer, reconcile]
+      targets: [market_data, portfolio, execution_engine]
+      boundaries: [market_data, portfolio, execution_engine]
+    trust:
+      initial: 0.4
+      minimum_for_action: 0.5
+    owner: "trading-ops@acme.com"
+    reason: "Automated trade execution"
+
+  compliance-agent:
+    scope:
+      actions: [read, query, audit, report]
+      targets: [trade_log, regulatory_db, compliance_reports]
+      boundaries: [trade_log, regulatory_db, compliance_reports]
+    trust:
+      initial: 0.6
+      minimum_for_action: 0.3
+    owner: "compliance@acme.com"
+    reason: "Regulatory compliance monitoring"
+
+dimensions:
+  weights:
+    scope_compliance: 2.0
+    authority_verification: 2.0
+    resource_boundaries: 1.5
+    behavioral_consistency: 1.2
+    cascading_impact: 1.8
+    stakeholder_impact: 1.5
+    incident_detection: 2.0
+    isolation_integrity: 1.8
+    temporal_compliance: 1.2
+    precedent_alignment: 1.0
+    transparency: 1.0
+    human_override: 2.0
+    ethical_alignment: 2.0
+
+  vetoes:
+    - scope_compliance
+    - authority_verification
+    - resource_boundaries
+    - incident_detection
+    - isolation_integrity
+    - temporal_compliance
+    - human_override
+    - ethical_alignment
+
+thresholds:
+  allow: 0.8
+  deny: 0.4
+
+trust:
+  success_increment: 0.005
+  violation_decrement: 0.08
+  interrupt_cost: 0.05
+  decay_rate: 0.002
+  floor: 0.05
+  ceiling: 0.90
+
+compliance:
+  frameworks: [SOC2, PCI-DSS]

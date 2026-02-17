@@ -1,0 +1,85 @@
+name: 'Nomotic CI — Governance Validation'
+description: 'Validate AI governance configurations, run adversarial tests, detect configuration drift, and generate compliance evidence bundles'
+author: 'Nomotic AI'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  config_path:
+    description: 'Path to governance configuration directory or file'
+    required: false
+    default: '.'
+  config_file:
+    description: 'Name of the governance config file to look for'
+    required: false
+    default: 'nomotic.yaml'
+  baseline_ref:
+    description: 'Git ref for baseline comparison (for drift detection)'
+    required: false
+    default: 'origin/main'
+  adversarial_tests:
+    description: 'Run adversarial test suite against the governance config'
+    required: false
+    default: 'true'
+  compound_authority_check:
+    description: 'Analyze for compound authority vulnerabilities'
+    required: false
+    default: 'true'
+  drift_detection:
+    description: 'Detect configuration drift from baseline'
+    required: false
+    default: 'true'
+  evidence_bundle:
+    description: 'Generate compliance evidence bundle for this change'
+    required: false
+    default: 'false'
+  compliance_frameworks:
+    description: 'Comma-separated compliance frameworks for evidence bundle (SOC2,HIPAA,PCI-DSS,ISO27001)'
+    required: false
+    default: ''
+  fail_on_critical:
+    description: 'Fail the action if critical issues are found'
+    required: false
+    default: 'true'
+  fail_on_adversarial:
+    description: 'Fail the action if adversarial tests fail'
+    required: false
+    default: 'true'
+  post_comment:
+    description: 'Post results as a PR comment'
+    required: false
+    default: 'true'
+  github_token:
+    description: 'GitHub token for PR comment posting'
+    required: false
+    default: ${{ github.token }}
+  sanitize_output:
+    description: 'Sanitize sensitive data in outputs and evidence bundles'
+    required: false
+    default: 'true'
+  bundle_dir:
+    description: 'Directory to write evidence bundles'
+    required: false
+    default: '.nomotic/bundles'
+
+outputs:
+  validation_status:
+    description: 'Overall validation result: pass, warn, fail'
+  issues_found:
+    description: 'Number of issues found'
+  critical_issues:
+    description: 'Number of critical issues'
+  adversarial_pass_rate:
+    description: 'Adversarial test pass rate (0.0-1.0)'
+  drift_detected:
+    description: 'Whether configuration drift was detected (true/false)'
+  compound_authority_flags:
+    description: 'Number of compound authority flags raised'
+  bundle_path:
+    description: 'Path to generated evidence bundle (if requested)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

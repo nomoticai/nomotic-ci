@@ -1,0 +1,65 @@
+version: "1.0"
+
+agents:
+  triage-agent:
+    scope:
+      actions: [read, query, classify, recommend]
+      targets: [patient_intake, symptom_db, protocol_db]
+      boundaries: [patient_intake, symptom_db, protocol_db]
+    trust:
+      initial: 0.4
+      minimum_for_action: 0.5
+    owner: "clinical-ops@hospital.org"
+    reason: "Patient triage assistance"
+
+  scheduling-agent:
+    scope:
+      actions: [read, write, schedule, notify]
+      targets: [appointment_system, staff_calendar, patient_portal]
+      boundaries: [appointment_system, staff_calendar, patient_portal]
+    trust:
+      initial: 0.5
+      minimum_for_action: 0.3
+    owner: "scheduling@hospital.org"
+    reason: "Appointment scheduling"
+
+dimensions:
+  weights:
+    scope_compliance: 2.0
+    authority_verification: 2.0
+    resource_boundaries: 1.2
+    behavioral_consistency: 1.0
+    cascading_impact: 1.5
+    stakeholder_impact: 2.0
+    incident_detection: 1.5
+    isolation_integrity: 2.0
+    temporal_compliance: 1.0
+    precedent_alignment: 0.8
+    transparency: 1.5
+    human_override: 2.0
+    ethical_alignment: 2.0
+
+  vetoes:
+    - scope_compliance
+    - authority_verification
+    - resource_boundaries
+    - incident_detection
+    - isolation_integrity
+    - temporal_compliance
+    - human_override
+    - ethical_alignment
+
+thresholds:
+  allow: 0.75
+  deny: 0.35
+
+trust:
+  success_increment: 0.008
+  violation_decrement: 0.06
+  interrupt_cost: 0.04
+  decay_rate: 0.001
+  floor: 0.05
+  ceiling: 0.92
+
+compliance:
+  frameworks: [HIPAA, SOC2]
