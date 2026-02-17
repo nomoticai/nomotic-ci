@@ -62,7 +62,7 @@ agents:
     trust:
       initial: 0.5
       minimum_for_action: 0.3
-    owner: "cs-team@acme.com"
+    owner: "email@xxxxx.xxx"
     reason: "Customer service automation"
 
 dimensions:
