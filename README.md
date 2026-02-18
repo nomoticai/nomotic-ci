@@ -1,263 +1,578 @@
-# Nomotic CI — Governance Validation for CI/CD
+[![CI](https://github.com/nomoticai/nomotic/actions/workflows/ci.yml/badge.svg)](https://github.com/nomoticai/nomotic/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nomoticai/nomotic/branch/main/graph/badge.svg)](https://codecov.io/gh/nomoticai/nomotic)
+[![PyPI](https://img.shields.io/pypi/v/nomotic)](https://pypi.org/project/nomotic/)
+[![Python](https://img.shields.io/pypi/pyversions/nomotic)](https://pypi.org/project/nomotic/)
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://nomotic.readthedocs.io)
+[![License](https://img.shields.io/github/license/nomoticai/nomotic)](LICENSE)
 
-[![CI](https://github.com/NomoticAI/nomotic-ci/actions/workflows/ci.yml/badge.svg)](https://github.com/NomoticAI/nomotic-ci/actions/workflows/ci.yml)
+# Nomotic
 
-**nomotic-ci validates your AI governance rules before they reach production.**
+Runtime governance framework for agentic AI. Laws for agents, enforced continuously.
 
-For runtime agent governance, see [Nomotic](https://github.com/NomoticAI/Nomotic).
+Nomotic prevents unauthorized decisions, unauthorized actions, and unauthorized costs at runtime. It evaluates every action across 13 governance dimensions simultaneously, hard-blocks actions that violate scope or authority boundaries, enforces rate and cost limits with graduated degradation and hard vetoes, governs agent reasoning before action occurs, and maintains mechanical authority to interrupt actions mid-execution.
 
-## What It Does
+Most governance frameworks operate before or after execution. Nomotic operates *during* execution. If you cannot stop it, you do not control it.
 
-Nomotic CI is a GitHub Action that validates AI governance configurations (`nomotic.yaml`) in your CI/CD pipeline. On every PR that modifies governance rules, it:
+## What Nomotic Does
 
-- **Validates** configuration structure and logical consistency
-- **Runs adversarial tests** against the config to verify it blocks unauthorized actions
-- **Detects drift** from the baseline configuration on the target branch
-- **Analyzes compound authority** risks across agents
-- **Generates compliance evidence bundles** for auditable governance changes
+Nomotic governs AI agents at every level:
 
-## Quick Start
+**What agents are not allowed to do** — hard enforcement. Scope violations are vetoed. Authority check failures are vetoed. Cost limit breaches are vetoed. Actions either pass or they don't. No gray area, no debate, no exceptions.
 
-Add this workflow to your repository:
+**What agents are allowed to do** — conditional authority. Scope compliance, authority envelopes, and explicit permission boundaries define where agents can operate. Trust calibration expands or contracts that authority based on evidence.
 
-```yaml
-# .github/workflows/governance.yml
-name: Governance Validation
+**What happens when something goes wrong mid-execution** — interrupt authority. Governance maintains mechanical authority to halt actions, agents, workflows, or the entire system during execution, with rollback support and state recovery.
 
-on:
-  pull_request:
-    paths:
-      - 'nomotic.yaml'
-      - '**/nomotic.yaml'
+**What agents actually do** — behavioral fingerprints, drift detection, pattern monitoring across thousands of actions. Nomotic detects when agent behavior changes shape, and when humans stop paying attention.
 
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history needed for drift detection against baseline
+**How agents reason about what to do** — the Nomotic Protocol: structured reasoning artifacts that externalize agent deliberation in a governable format.
 
-      - uses: NomoticAI/nomotic-ci@v1
-        with:
-          config_path: '.'
-          adversarial_tests: 'true'
-          drift_detection: 'true'
-          compound_authority_check: 'true'
+**Whether reasoning holds up** — structural evaluation of reasoning completeness, authority claims, decision-action alignment, uncertainty calibration.
+
+**Proof that governance occurred** — signed JWT governance tokens, full audit trails, configuration provenance, accountability chains tracing every decision to human authority.
+
+**Contextual awareness** — ten types of situational context that adjust governance posture based on workflow state, operational conditions, delegation chains, and environmental signals.
+
+**Workflow-level governance** — dependency analysis, consequence projection, compound authority detection, and cumulative risk tracking across multi-step agent workflows.
+
+**Ethical transparency** — outcome equity analysis, bias detection in governance rules, ethical reasoning evaluation, and cross-dimensional signal detection. Nomotic surfaces patterns. Organizations define criteria. Humans make judgment calls.
+
+## Why Runtime
+
+Static rules can't govern systems that learn and adapt. Nomotic uses **Dynamic Trust Calibration** — trust earned through evidence, expanded and contracted continuously.
+
+Pattern matching recognizes form but misses intent. Nomotic uses **13-Dimensional Simultaneous Evaluation** — security, ethics, compliance, behavior, and authority assessed together, not in sequence.
+
+Post-incident review doesn't undo irreversible actions. Nomotic uses **Interrupt Authority** — mechanical authority to halt execution mid-action, with rollback and state recovery.
+
+Human-in-the-loop fails when the human stops paying attention. Nomotic uses **Bidirectional Drift Detection** — detects when agents drift *and* when humans disengage.
+
+## Quickstart
+
+```python
+from nomotic import (
+    Action,
+    AgentContext,
+    GovernanceRuntime,
+    TrustProfile,
+    Verdict,
+)
+
+# Create the runtime — all 13 dimensions, three evaluation tiers,
+# interruption authority, trust calibration, audit trail, contextual
+# modifier, and workflow governor are initialized.
+runtime = GovernanceRuntime()
+
+# Configure what the agent is allowed to do
+runtime.configure_scope(
+    agent_id="agent-1",
+    scope={"read", "write", "query"},
+    actor="admin@acme.com",
+    reason="Initial agent deployment",
+)
+
+# Create an action the agent wants to perform
+action = Action(
+    agent_id="agent-1",
+    action_type="write",
+    target="customer_records",
+    parameters={"field": "email", "value": "new@example.com"},
+)
+
+# Create the agent's context
+context = AgentContext(
+    agent_id="agent-1",
+    trust_profile=TrustProfile(agent_id="agent-1"),
+)
+
+# Evaluate the action through the full governance pipeline
+verdict = runtime.evaluate(action, context)
+
+print(f"Verdict: {verdict.verdict.name}")  # ALLOW, DENY, MODIFY, ESCALATE, or SUSPEND
+print(f"UCS: {verdict.ucs:.3f}")           # 0.0-1.0 unified confidence
+print(f"Tier: {verdict.tier}")             # Which tier decided (1, 2, or 3)
+print(f"Time: {verdict.evaluation_time_ms:.1f}ms")
 ```
 
-## Governance Configuration
+## Execution with Interruption Rights
 
-Create a `nomotic.yaml` in your repository to define your AI agent governance rules:
+The governance pipeline does not end at the verdict. For approved actions, the runtime provides execution handles that allow governance to intervene mid-stream.
 
-```yaml
-version: "1.0"
+```python
+if verdict.verdict == Verdict.ALLOW:
+    # Register the action for monitored execution
+    handle = runtime.begin_execution(
+        action,
+        context,
+        rollback=lambda: undo_write(action),  # Called if interrupted
+    )
 
-agents:
-  customer-service-agent:
-    scope:
-      actions: [read, write, query]
-      targets: [customer_records, order_history, faq_database]
-      boundaries: [customer_records, order_history, faq_database]
-    trust:
-      initial: 0.5
-      minimum_for_action: 0.3
-    owner: "email@xxxxx.xxx"
-    reason: "Customer service automation"
+    # The execution layer cooperates by checking for interrupts
+    for record in records_to_process:
+        if handle.check_interrupt():
+            break  # Governance has halted this action
+        process(record)
 
-dimensions:
-  weights:
-    scope_compliance: 1.5
-    authority_verification: 1.5
-    resource_boundaries: 1.2
-    behavioral_consistency: 1.0
-    cascading_impact: 1.3
-    stakeholder_impact: 1.2
-    incident_detection: 1.5
-    isolation_integrity: 1.4
-    temporal_compliance: 0.8
-    precedent_alignment: 0.7
-    transparency: 0.6
-    human_override: 2.0
-    ethical_alignment: 2.0
-
-  vetoes:
-    - scope_compliance
-    - authority_verification
-    - resource_boundaries
-    - incident_detection
-    - isolation_integrity
-    - temporal_compliance
-    - human_override
-    - ethical_alignment
-
-thresholds:
-  allow: 0.7
-  deny: 0.3
-
-trust:
-  success_increment: 0.01
-  violation_decrement: 0.05
-  interrupt_cost: 0.03
-  decay_rate: 0.001
-  floor: 0.05
-  ceiling: 0.95
+    # On normal completion, update trust and history
+    runtime.complete_execution(action.id, context)
 ```
 
-See the `examples/` directory for fintech and healthcare configurations.
+Governance can interrupt at any time, from any thread:
 
-## What It Checks
+```python
+# Interrupt a single action
+runtime.interrupt_action(action.id, reason="Anomaly detected in write pattern")
 
-### Configuration Validation
+# Interrupt everything an agent is doing
+from nomotic import InterruptScope
+runtime.interrupt_action(action.id, reason="Agent compromised", scope=InterruptScope.AGENT)
 
-- Schema validation (required fields, valid dimension names)
-- Threshold inversion (allow <= deny creates a paradox)
-- Veto-weight contradictions (veto authority with zero weight)
-- Missing vetoes on critical dimensions
-- Overlapping agent scopes with shared targets
-- Overprivileged agents (broad scopes)
-- Trust floor above agent minimums
-- Runtime simulation (verifies out-of-scope actions are denied)
-
-### Adversarial Testing
-
-Runs six attack scenarios per agent against the config using Nomotic's governance runtime:
-
-| Scenario | What It Tests |
-|----------|---------------|
-| Prompt Injection Resistance | Injected instructions attempting to bypass governance |
-| Privilege Escalation | Agents attempt actions outside their scope |
-| Drift Inducement | Gradual behavioral shifts to erode governance boundaries |
-| Trust Manipulation | Low-trust agents attempt unauthorized actions |
-| Confused Deputy | Cross-agent privilege confusion and delegation abuse |
-| Boundary Probing | In-scope actions on out-of-boundary targets |
-
-### Drift Detection
-
-Compares the PR's config against the target branch baseline:
-
-| Category | Severity | Example |
-|----------|----------|---------|
-| Scope expansion | Warning/Critical | New actions added (critical if delete/transfer/execute) |
-| Threshold relaxation | Warning | allow_threshold decreased |
-| Veto removal | Critical | Dimension removed from veto list |
-| Weight reduction | Warning | Security dimension weight decreased |
-| Agent added/removed | Info | New agent definition |
-| Trust relaxation | Warning | violation_decrement decreased |
-
-### Compound Authority Analysis
-
-Detects when individually-safe agent scopes combine to create unsafe capabilities:
-
-- **Cross-agent**: Agent A reads + Agent B writes on shared target = effective update
-- **Single-agent**: Agent has read + write + delete = full data lifecycle control
-- **Workflow**: Sequential action patterns that escalate authority
-
-## Example PR Comment
-
-When a PR modifies governance rules, Nomotic CI posts a comment like this:
-
-```markdown
-## 🛡️ Nomotic Governance Validation
-
-**Status**: ✅ Pass
-
-### Configuration Validation
-| Check | Status | Details |
-|-------|--------|---------|
-| Schema validation | ✅ | Valid nomotic.yaml |
-| Threshold consistency | ✅ | allow (0.7) > deny (0.3) |
-| Scope security | ⚠️ | Agent `trading-agent` has broad scope (4 action types) |
-| Simulation check | ✅ | Out-of-scope actions correctly denied |
-
-### Adversarial Testing
-**Pass rate: 12/12 (100%)**
-
-| Scenario | Result | Details |
-|----------|--------|---------|
-| Prompt Injection Resistance | ✅ | All injection attempts blocked |
-| Privilege Escalation | ✅ | All escalation attempts blocked |
-| Drift Inducement | ✅ | Drift correctly flagged |
-| Trust Manipulation | ✅ | Trust manipulation blocked |
-| Confused Deputy | ✅ | Deputy attacks handled |
-| Boundary Probing | ✅ | All boundary probes handled |
-
-### Configuration Drift
-| Change | Severity | Details |
-|--------|----------|---------|
-| `agents.trading-agent.scope.actions` | ⚠️ Warning | Added `reconcile` action |
-| `thresholds.allow` | ℹ️ Info | Changed 0.75 → 0.80 (stricter) |
-
-### Compound Authority
-No compound authority vulnerabilities detected.
-
----
-*Validated by Nomotic CI v0.1.0*
+# Emergency: interrupt all running actions globally
+runtime.interrupt_action(action.id, reason="System-wide halt", scope=InterruptScope.GLOBAL)
 ```
 
-## Inputs
+## The Nomotic Protocol
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| `config_path` | `.` | Path to governance config directory or file |
-| `config_file` | `nomotic.yaml` | Config file name to search for |
-| `baseline_ref` | `origin/main` | Git ref for drift detection baseline |
-| `adversarial_tests` | `true` | Run adversarial test suite |
-| `compound_authority_check` | `true` | Analyze compound authority risks |
-| `drift_detection` | `true` | Detect configuration drift |
-| `evidence_bundle` | `false` | Generate compliance evidence bundle |
-| `compliance_frameworks` | ` ` | Comma-separated frameworks (SOC2, HIPAA, PCI-DSS, ISO27001) |
-| `fail_on_critical` | `true` | Fail if critical issues found |
-| `fail_on_adversarial` | `true` | Fail if adversarial tests fail |
-| `post_comment` | `true` | Post results as PR comment |
-| `github_token` | `${{ github.token }}` | Token for PR comments |
-| `sanitize_output` | `true` | Sanitize sensitive data in outputs |
-| `bundle_dir` | `.nomotic/bundles` | Directory for evidence bundles |
+The Nomotic Protocol makes agent reasoning visible, structured, and governable. Agents externalize their reasoning as structured artifacts. Governance evaluates the reasoning before action occurs. A signed token proves evaluation took place.
 
-## Outputs
+```python
+from nomotic import (
+    ReasoningArtifact,
+    ProtocolEvaluator,
+    GovernanceToken,
+)
 
-| Output | Description |
-|--------|-------------|
-| `validation_status` | Overall result: `pass`, `warn`, or `fail` |
-| `issues_found` | Total issues found |
-| `critical_issues` | Critical issues count |
-| `adversarial_pass_rate` | Test pass rate (0.0–1.0) |
-| `drift_detected` | Whether drift was detected (`true`/`false`) |
-| `compound_authority_flags` | Number of compound authority findings |
-| `bundle_path` | Path to evidence bundle (if generated) |
+# Agent produces a structured reasoning artifact
+artifact = ReasoningArtifact(
+    identity={"agent_id": "cs-agent-47", "envelope_id": "env-returns-gold"},
+    task={
+        "goal": "Process return request for order #ORD-88421",
+        "origin": "user_request",
+        "constraints_identified": [
+            {"type": "policy", "description": "Standard return limit is $500",
+             "source": "policy://returns/standard-limit"},
+            {"type": "authority", "description": "Gold-tier authority extends to $1500",
+             "source": "envelope://env-returns-gold"},
+        ],
+    },
+    reasoning={
+        "factors": [
+            {"id": "f1", "type": "constraint", "description": "Amount exceeds standard limit",
+             "source": "policy://returns/standard-limit",
+             "assessment": "Conditional authority required",
+             "influence": "decisive", "confidence": 1.0},
+            {"id": "f2", "type": "context", "description": "Customer is Gold tier, $127K lifetime spend",
+             "source": "data://customer/profile",
+             "assessment": "Qualifies for conditional authority",
+             "influence": "decisive", "confidence": 0.99},
+        ],
+        "alternatives_considered": [
+            {"method": "deny", "context": "Cite standard $500 limit",
+             "reason_rejected": "Customer qualifies for Gold-tier exception"},
+            {"method": "escalate", "context": "Route to human reviewer",
+             "reason_rejected": "Amount within conditional authority envelope"},
+        ],
+    },
+    decision={
+        "intended_action": {"method": "approve", "target": "order/ORD-88421",
+                           "context": "Gold-tier return exception",
+                           "parameters": {"amount": 800.00}},
+        "justifications": [
+            {"factor_id": "f1", "explanation": "Amount requires conditional authority"},
+            {"factor_id": "f2", "explanation": "Gold tier activates conditional envelope"},
+        ],
+        "authority_claim": {"envelope_type": "conditional",
+                           "conditions_met": ["Customer tier: Gold", "Amount within $500-$1500"]},
+    },
+    uncertainty={
+        "unknowns": [{"description": "Product condition unverified",
+                      "impact": "Does not affect authority at this amount"}],
+        "assumptions": [{"description": "Customer tier data is current",
+                        "basis": "Real-time profile system",
+                        "risk_if_wrong": "Conditional authority may not apply"}],
+        "overall_confidence": 0.88,
+    },
+)
 
-## Evidence Bundles
+# Governance evaluates the reasoning
+evaluator = ProtocolEvaluator(runtime=runtime, signing_key="your-secret-key")
+response = evaluator.evaluate_full(artifact)
 
-When `evidence_bundle: 'true'`, Nomotic CI generates a JSON evidence package documenting:
+print(f"Verdict: {response.verdict}")  # PROCEED, REVISE, ESCALATE, or DENY
+print(f"Token: {response.token}")       # Signed JWT governance token
+print(f"Completeness: {response.assessment.completeness.score}")
+print(f"Alignment: {response.assessment.alignment.score}")
+```
 
-- What governance rules were validated
-- What checks were performed and their results
-- What adversarial tests were run
-- What drift was detected
-- Compliance framework mappings (SOC2, HIPAA, PCI-DSS, ISO27001)
+The governance token is a signed JWT that execution environments validate before permitting actions — the same pattern as OAuth tokens for authorization:
 
-Archive bundles as build artifacts for compliance retention:
+```
+Agent reasons → Submits artifact → Governance evaluates → Token issued
+                                                              ↓
+                                         Agent acts with token attached
+                                                              ↓
+                                      Execution environment validates token
+```
 
-```yaml
-      - uses: NomoticAI/nomotic-ci@v1
-        with:
-          evidence_bundle: 'true'
-          compliance_frameworks: 'SOC2,HIPAA'
+### Method Taxonomy
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: governance-evidence
-          path: .nomotic/bundles/
-          retention-days: 2555  # 7 years for compliance
+Every action in the protocol is identified by a standardized **method** — a single word that preserves agent intent throughout the governance lifecycle. 84 methods across 10 categories:
+
+| Category | Methods | Governance Profile |
+|----------|---------|-------------------|
+| Data | `query`, `read`, `write`, `update`, `delete`, `archive`, `restore`, `export`, `import` | Standard data governance |
+| Retrieval | `fetch`, `search`, `find`, `scan`, `filter`, `extract`, `pull` | Lower weight, primarily audit |
+| Decision | `approve`, `deny`, `escalate`, `recommend`, `classify`, `prioritize`, `evaluate`, `validate`, `check`, `rank`, `predict` | Elevated — agent making determinations |
+| Communication | `notify`, `request`, `respond`, `reply`, `broadcast`, `subscribe`, `publish`, `send`, `call` | Moderate, stakeholder emphasis |
+| Orchestration | `schedule`, `assign`, `delegate`, `invoke`, `retry`, `cancel`, `pause`, `resume`, `route`, `run`, `start`, `open` | Cascading impact emphasis |
+| Transaction | `transfer`, `refund`, `charge`, `reserve`, `release`, `reconcile`, `purchase` | Highest governance weight |
+| Security | `authenticate`, `authorize`, `revoke`, `elevate`, `sign`, `register` | Critical, veto-capable |
+| System | `configure`, `deploy`, `monitor`, `report`, `log`, `audit`, `sync` | Operational governance |
+| Generation | `generate`, `create`, `summarize`, `transform`, `translate`, `normalize`, `merge`, `link`, `map`, `make` | Moderate, ethical emphasis |
+| Control | `set`, `take`, `show`, `turn`, `break`, `submit` | Context-dependent |
+
+Methods serve governance, behavioral fingerprinting, token binding, and API design — one vocabulary, end to end.
+
+### Protocol Flows
+
+| Flow | When to Use | Token |
+|------|------------|-------|
+| **Full Deliberation** | High-stakes, irreversible, or novel actions | Single-use, 60s lifetime |
+| **Summary** | Routine actions within established authority | Class-scope, 15m lifetime |
+| **Post-Hoc** | Latency-sensitive, low-risk, reversible | No token (retroactive assessment) |
+
+## The Governance Pipeline
+
+Every action passes through this pipeline:
+
+```
+                                     ┌─────────────────────────────────┐
+                                     │  Context Profile (10 types)     │
+                                     │  Workflow │ Situational │ etc.  │
+                                     └──────────────┬──────────────────┘
+                                                    │
+                                                    ▼
+                                     ┌──────────────────────────────────┐
+                                     │  Contextual Modifier             │
+                                     │  (adjusts weights per-evaluation)│
+                                     └──────────────┬───────────────────┘
+                                                    │
+                                                    ▼
+                                     ┌──────────────────────────────────┐
+                                     │  Workflow Governor               │
+                                     │  (sequence + dependency analysis)│
+                                     └──────────────┬───────────────────┘
+                                                    │
+                                                    ▼
+                                     ┌─────────────────────────────────┐
+                                     │      13 Dimensions              │
+                                     │  (evaluated simultaneously)     │
+                                     └──────────────┬──────────────────┘
+                                                    │
+                                                    ▼
+┌──────────┐    ┌────────────────────┐    ┌─────────────────────┐
+│  Action   │───▶│  Trust Time Decay   │───▶│  Tier 1: Veto Gate  │──── Veto? ──▶ DENY/ESCALATE
+└──────────┘    └────────────────────┘    └─────────┬───────────┘
+                                                    │ No veto
+                                                    ▼
+                                     ┌──────────────────────────┐
+                                     │  UCS Computation          │
+                                     │  (weighted + trust)       │
+                                     └──────────┬───────────────┘
+                                                │
+                                                ▼
+                                     ┌──────────────────────────┐
+                                     │  Tier 2: Thresholds       │──── Clear? ──▶ ALLOW/DENY
+                                     │  allow=0.7  deny=0.3      │
+                                     └──────────┬───────────────┘
+                                                │ Ambiguous
+                                                ▼
+                                     ┌──────────────────────────┐
+                                     │  Tier 3: Deliberation     │──▶ ALLOW/DENY/MODIFY/ESCALATE
+                                     │  (trust + history)        │
+                                     └──────────┬───────────────┘
+                                                │
+                                     ┌──────────▼───────────────┐
+                                     │  Cross-Dimensional        │
+                                     │  Signal Detection         │
+                                     └──────────┬───────────────┘
+                                                │
+                                     ┌──────────▼───────────────┐
+                                     │  Trust Calibration        │
+                                     │  Behavioral Fingerprint   │
+                                     │  Audit Trail              │
+                                     └──────────────────────────┘
+```
+
+## The 13 Governance Dimensions
+
+Every action is evaluated across all 13 dimensions simultaneously. Each dimension produces an independent score (0.0 = maximum concern, 1.0 = no concern). Dimensions with veto authority can halt an action regardless of other scores.
+
+| # | Dimension | Weight | Veto | What It Checks |
+|---|-----------|--------|------|----------------|
+| 1 | Scope Compliance | 1.5 | Yes | Is the action within the agent's authorized scope? |
+| 2 | Authority Verification | 1.5 | Yes | Does the agent have specific authority for this action? |
+| 3 | Resource Boundaries | 1.2 | Yes | Are rate, concurrency, and cost limits respected? |
+| 4 | Behavioral Consistency | 1.0 | No | Does this match the agent's established patterns? |
+| 5 | Cascading Impact | 1.3 | No | What are the downstream consequences? |
+| 6 | Stakeholder Impact | 1.2 | No | Who is affected and how sensitive are they? |
+| 7 | Incident Detection | 1.5 | Yes | Does this match known failure or attack patterns? |
+| 8 | Isolation Integrity | 1.4 | Yes | Are containment boundaries maintained? |
+| 9 | Temporal Compliance | 0.8 | Yes | Is the timing appropriate? |
+| 10 | Precedent Alignment | 0.7 | No | Is this consistent with past governance decisions? |
+| 11 | Transparency | 0.6 | No | Is the action auditable and explainable? |
+| 12 | Human Override | **2.0** | Yes | Is human intervention required? |
+| 13 | Ethical Alignment | **2.0** | Yes | Does the action meet ethical constraints? |
+
+See [docs/dimensions.md](docs/dimensions.md) for detailed documentation of each dimension.
+
+## Trust Calibration
+
+Trust is not binary. It is calibrated continuously:
+
+- **Building trust is slow**: +0.01 per successful action
+- **Losing trust is fast**: -0.05 per violation (5:1 ratio)
+- **Interruption costs trust**: -0.03 per interrupt
+- **Drift erodes trust**: -0.002 to -0.04 scaled by drift severity and confidence
+- **Trust decays**: Drifts toward baseline (0.5) when idle
+- **Trust recovers**: When drift normalizes, trust stops eroding
+- **Trust is bounded**: Floor at 0.05, ceiling at 0.95
+
+Trust feeds back into every governance decision:
+- Lower trust shifts UCS scores downward
+- Very low trust (<0.3) triggers mandatory human review
+- Trust influences Tier 3 deliberation outcomes
+- Trust trajectory (rising, falling, volatile, stable) provides historical context
+- Reasoning quality contributes to trust over time
+
+## Behavioral Intelligence
+
+Nomotic builds a behavioral fingerprint for each agent from observed governance verdicts:
+
+- **Four distributions**: action types, targets, temporal patterns, outcomes
+- **Ten archetype priors**: analyst, communicator, processor, administrator, etc.
+- **JSD-based drift detection**: Jensen-Shannon divergence measures how far current behavior deviates from baseline
+- **Sliding windows**: recent behavior compared against established patterns
+- **Drift severity tiers**: low, moderate, high, critical — each with corresponding trust erosion rates
+- **Alert generation**: drift alerts with deduplication and acknowledgment tracking
+
+The behavioral loop is fully operational: observe → detect drift → adjust trust → trust affects governance → verdicts observed → cycle continues.
+
+## Transparency & Accountability
+
+Every governance decision is fully auditable:
+
+- **Audit Trail**: Structured, queryable log of every governance decision with full dimension score snapshots, trust state, drift state, context codes, and human-readable justification narratives
+- **43 Context Codes** across 10 categories for structured event classification
+- **Configuration Provenance**: Every rule change records who changed what, when, why, with ticket references — Git for governance rules
+- **Owner Engagement Tracking**: Monitors whether the human responsible for an agent reviews alerts, acknowledges drift, and approves overrides
+- **User Activity Classification**: Tracks user interaction patterns (normal, boundary testing, suspicious) without storing raw content
+- **Governance Tokens**: Signed JWTs proving that reasoning was evaluated and action was approved, with full chain from token → evaluation → reasoning → agent → human authority
+
+## Contextual Governance
+
+Ten types of context adjust governance posture based on the situation:
+
+| Context Type | What It Captures |
+|-------------|-----------------|
+| **Workflow** | Step position, dependencies, completed/remaining steps, rollback points |
+| **Situational** | Origin (user request, scheduled, agent-initiated), operational mode, urgency |
+| **Relational** | Delegation chains, multi-agent coordination, compound capability detection |
+| **Temporal** | Operational state, recent events, time pressure, environmental conditions |
+| **Historical** | Trust trajectory, recent verdicts, scope changes, reasoning quality trends |
+| **Input** | Structured summary of what was requested (privacy-preserving, no raw content) |
+| **Output** | What was produced, cumulative impact, reversibility |
+| **External** | Market data, threat intelligence, regulatory alerts, system status |
+| **Meta** | Evaluation count, revise/denial history, governance load |
+| **Feedback** | User satisfaction signals, human override history, downstream outcomes |
+
+The **Contextual Modifier** reads context profiles and produces per-evaluation weight adjustments. Agent-initiated actions increase Human Override weight. Unresolved dependencies produce critical signals. Falling trust increases all dimension weights. Adversarial input patterns elevate security dimensions. All adjustments are temporary (per-evaluation), auditable, and configurable.
+
+## Workflow Governance
+
+The **Workflow Governor** tracks multi-step workflows as governance objects:
+
+- **Dependency Graph**: Structural analysis of step relationships — requires, constrains, enables, informs
+- **Consequence Projection**: Forward-looking risk assessment along dependency chains (depth-limited, not exhaustive enumeration)
+- **Ordering Analysis**: Detects commitment before dependency, irreversible before verification, authority escalation sequences, resource lock chains
+- **Compound Authority Detection**: Identifies when individually-authorized steps achieve an unauthorized outcome — scope assembly, authority ladders, resource aggregation
+- **Cumulative Risk Tracking**: Aggregate risk across workflow steps with trajectory analysis (stable, increasing, accelerating)
+- **Cross-Step Drift Detection**: Monitors whether agent behavior gradually shifts across a long workflow
+
+## Ethical Governance Infrastructure
+
+Nomotic provides transparency for ethical accountability, not ethical judgment. Organizations define criteria. Nomotic evaluates against them. Humans make the calls.
+
+- **Outcome Equity Analyzer**: Examines governance decision patterns across populations. Organizations define protected attributes and disparity thresholds. The analyzer surfaces statistical disparities and proxy discrimination signals. It does not label outcomes as "biased" — it presents data for human evaluation.
+- **Anonymization Policy**: Configurable rules for which attributes are visible to agents for which methods. Gender hidden during returns processing but visible during healthcare. Contextual, not blanket.
+- **Bias Detection Engine**: Examines governance rules themselves for structural bias potential — neutral rules on non-uniform populations, proxy variables, threshold cliff effects, asymmetric authority.
+- **Ethical Reasoning Evaluator**: Scores agent reasoning on stakeholder consideration, harm awareness, fairness consideration, alternative equity, and uncertainty honesty. Structural checks, not semantic judgment.
+- **Cross-Dimensional Signal Detector**: Detects governance patterns that emerge from dimension interactions — discriminatory compliance, empathetic exploitation, invisible walls, trust-authority mismatches. Eight built-in patterns, extensible with organization-specific patterns.
+
+## Integration
+
+### SDK
+
+Agents integrate governance through the SDK:
+
+```python
+from nomotic.sdk import GovernedAgent
+
+agent = GovernedAgent(
+    agent_id="agent-1",
+    governance_url="https://governance.acme.com",
+    certificate_path="certs/agent-1.pem",
+)
+
+# Every request goes through governance
+response = agent.request("POST", "https://api.acme.com/orders", json=order_data)
+```
+
+### Middleware
+
+Services validate governance through middleware:
+
+```python
+# FastAPI
+from nomotic.middleware import NomoticFastAPI
+
+app = FastAPI()
+NomoticFastAPI(app, validation_level="local_ca")
+
+# Flask
+from nomotic.middleware import NomoticFlask
+
+app = Flask(__name__)
+NomoticFlask(app, validation_level="headers")
+```
+
+### REST API
+
+Full governance API with endpoints for:
+
+- Action evaluation and reasoning submission
+- Governance token validation and introspection
+- Audit trail queries and summaries
+- Configuration provenance
+- Owner engagement and user activity
+- Context profile management
+- Workflow assessment and dependency analysis
+- Equity reports and bias assessments
+- Cross-dimensional signal detection
+- Schema and version negotiation
+
+## Architecture
+
+The governance pipeline chain:
+
+```
+Context Profile → Contextual Modifier → Workflow Governor →
+  13 Dimensions (simultaneous) → UCS Engine → Three-Tier Cascade →
+    Cross-Dimensional Signals → Trust Calibration →
+      Behavioral Fingerprint → Audit Trail
+```
+
+For approved actions:
+```
+Governance Token → Execution with Interruption Rights →
+  Completion → Trust Update → Fingerprint Update → Audit Record
+```
+
+For the Nomotic Protocol:
+```
+Agent Reasoning Artifact → Structural Evaluation →
+  Ethical Reasoning Assessment → Dimensional Evaluation →
+    Governance Response → Signed JWT Token →
+      Execution Environment Validates Token
+```
+
+See [docs/architecture.md](docs/architecture.md) for the full architectural design.
+
+## Four Layers of Governance
+
+Nomotic implements a multi-modal governance model:
+
+**Layer 1 — Deterministic Law.** Hard boundaries. Vetoes. Binary scope checks. The lines that don't move. Tier 1 of the evaluation cascade.
+
+**Layer 2 — Structural Authority.** Conditional envelopes that define where agents exercise judgment. Authority that expands or contracts based on conditions, context, and trust.
+
+**Layer 3 — Evaluative Governance.** Pattern-based, retrospective, trust-calibrated. Behavioral fingerprints, drift detection, and outcome equity analysis evaluate whether aggregate decisions stay within acceptable bounds.
+
+**Layer 4 — Behavioral Governance.** Reasoning evaluation. Structured deliberation protocol. The agent's reasoning process becomes a governable, auditable artifact. Governance engages with *how agents think*, not just what they do.
+
+## Design Principles
+
+**Governance as Architecture** — Built in, not bolted on. Governance is a design decision, not a compliance layer.
+
+**Pre-Action Authorization** — Governance exists before action, not after. The Nomotic Protocol evaluates reasoning before execution occurs.
+
+**Explicit Authority Boundaries** — Authority is delegated, never assumed. Every permission traces to a human decision.
+
+**Verifiable Trust** — Trust is earned through evidence, not assumed from capability. Building trust takes 5x longer than losing it.
+
+**Ethical Justification** — Actions must be justifiable, not merely executable. The reasoning protocol requires agents to externalize and justify their decisions.
+
+**Accountable Governance** — Every rule has an owner. Every authorization traces to a responsible human. The provenance log and accountability chain make this mechanical, not aspirational.
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+For development:
+
+```bash
+pip install -e ".[dev]"
+pytest
 ```
 
 ## Requirements
 
-- Requires `nomotic>=0.2.0` ([PyPI](https://pypi.org/project/nomotic/))
 - Python 3.11+
-- Docker-based GitHub Action — no local installation needed
+- Zero runtime dependencies
+
+## Project Status
+
+| Phase | Component | Status | Tests |
+|-------|-----------|--------|-------|
+| 1-2 | Core Runtime (13 dimensions, UCS, tiers, trust, interrupts) | ✅ Complete | ~100 |
+| 3 | Integration (SDK, middleware, framework adapters) | ✅ Complete | ~50 |
+| 4 | Behavioral Intelligence (fingerprints, drift, trust trajectory) | ✅ Complete | ~115 |
+| 5 | Transparency & Accountability (audit, provenance, context codes) | ✅ Complete | ~150 |
+| 6 | Nomotic Protocol (reasoning artifacts, governance tokens, method taxonomy) | ✅ Complete | ~120 |
+| 7A | Context Profile Schema (10 context types) | ✅ Complete | ~60 |
+| 7B | Contextual Modifier (per-evaluation weight adjustment) | ✅ Complete | ~70 |
+| 7C | Workflow Governor (dependency analysis, consequence projection) | ✅ Complete | ~80 |
+| 8 | Ethical Governance (equity, bias, cross-dimensional signals) | 🔄 In Progress | ~135 |
+
+**Total: 1,000+ tests passing. Zero runtime dependencies.**
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — full architectural design, component interactions, design decisions
+- [13 Dimensions](docs/dimensions.md) — detailed documentation of each governance dimension
+- [Configuration](docs/configuration.md) — all tunable parameters with defaults and explanations
+- [Nomotic Protocol Specification](docs/nomotic-protocol-spec.md) — the protocol definition for reasoning governance
+- [Reasoning Artifact Schema](schemas/reasoning-artifact.v0.1.0.schema.json) — JSON Schema for reasoning artifacts
+- [Governance Response Schema](schemas/governance-response.v0.1.0.schema.json) — JSON Schema for governance responses
+- [Governance Token Schema](schemas/governance-token.v0.1.0.schema.json) — JSON Schema for JWT governance tokens
+- [Context Profile Schema](schemas/context-profile.v0.1.0.schema.json) — JSON Schema for context profiles
+
+## About Nomotic AI
+
+Nomotic AI is the governance counterpart to agentic AI. The term derives from the Greek word *nomos* (νόμος), meaning law, rule, or governance.
+
+Where agentic AI asks: *What can this system do?*
+Nomotic AI asks: *What should this system do, and under what laws?*
+
+Agentic AI is characterized by four verbs: perceive, reason, plan, act.
+Nomotic AI is characterized by four verbs: govern, authorize, trust, evaluate.
+
+Neither is complete without the other. Actions without laws are chaos. Laws without actions are inert. Effective AI deployment requires both.
+
+For the full conceptual foundation, see the [Nomotic AI position paper](docs/NomoticAI-Paper-v3.pdf).
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache 2.0
