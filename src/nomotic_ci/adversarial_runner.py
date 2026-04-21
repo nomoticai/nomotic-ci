@@ -16,13 +16,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from nomotic.adversarial import (
-    AdversarialRunner as LibraryRunner,
-    ScenarioTestResult as LibScenarioResult,
-    get_all_scenarios,
-)
+if TYPE_CHECKING:
+    from nomotic.internal.adversarial import (
+        AdversarialRunner as LibraryRunner,
+        ScenarioTestResult as LibScenarioResult,
+        get_all_scenarios,
+    )
+
+# Runtime imports with fallback for nomotic < 0.9.0
+try:
+    from nomotic.internal.adversarial import (
+        AdversarialRunner as LibraryRunner,
+        ScenarioTestResult as LibScenarioResult,
+        get_all_scenarios,
+    )
+except ImportError:  # pragma: no cover
+    from nomotic.adversarial import (  # type: ignore[no-redef]
+        AdversarialRunner as LibraryRunner,
+        ScenarioTestResult as LibScenarioResult,
+        get_all_scenarios,
+    )
 
 from nomotic_ci.config_loader import GovernanceConfig
 
