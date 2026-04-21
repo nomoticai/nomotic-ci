@@ -1,2 +1,2 @@
-nomotic>=0.1.0
+nomotic>=0.9.0
 pyyaml>=6.0

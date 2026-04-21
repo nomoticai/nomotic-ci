@@ -15,17 +15,33 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import combinations
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from nomotic import Action, AgentContext, TrustProfile
+if TYPE_CHECKING:
+    from nomotic.types import Action, AgentContext, TrustProfile
+    from nomotic.internal.sandbox import (
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
+
+# Runtime imports with fallback for nomotic < 0.9.0
+try:
+    from nomotic.types import Action, AgentContext, TrustProfile
+    from nomotic.internal.sandbox import (
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
+except ImportError:  # pragma: no cover
+    from nomotic import Action, AgentContext, TrustProfile  # type: ignore[no-redef]
+    from nomotic.sandbox import (  # type: ignore[no-redef]
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
+
 from nomotic.context_profile import (
     CompletedStep,
     ContextProfile,
     WorkflowContext,
-)
-from nomotic.sandbox import (
-    AgentConfig as SandboxAgentConfig,
-    build_sandbox_runtime,
 )
 from nomotic.workflow_governor import WorkflowGovernor, WorkflowGovernorConfig
 
