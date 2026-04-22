@@ -11,18 +11,36 @@ boundary enforcement via ``apply_config_to_runtime``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from nomotic import (
-    Action,
-    AgentContext,
-    GovernanceRuntime,
-    TrustProfile,
-    Verdict,
-)
-from nomotic.sandbox import (
-    AgentConfig as SandboxAgentConfig,
-    build_sandbox_runtime,
-)
+if TYPE_CHECKING:
+    from nomotic.runtime import GovernanceRuntime
+    from nomotic.types import Action, AgentContext, TrustProfile, Verdict
+    from nomotic.internal.sandbox import (
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
+
+# Runtime imports with fallback for nomotic < 0.9.0
+try:
+    from nomotic.runtime import GovernanceRuntime
+    from nomotic.types import Action, AgentContext, TrustProfile, Verdict
+    from nomotic.internal.sandbox import (
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
+except ImportError:  # pragma: no cover
+    from nomotic import (  # type: ignore[no-redef]
+        Action,
+        AgentContext,
+        GovernanceRuntime,
+        TrustProfile,
+        Verdict,
+    )
+    from nomotic.sandbox import (  # type: ignore[no-redef]
+        AgentConfig as SandboxAgentConfig,
+        build_sandbox_runtime,
+    )
 
 from nomotic_ci.config_loader import GovernanceConfig
 

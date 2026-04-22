@@ -124,7 +124,7 @@ Governance can interrupt at any time, from any thread:
 runtime.interrupt_action(action.id, reason="Anomaly detected in write pattern")
 
 # Interrupt everything an agent is doing
-from nomotic import InterruptScope
+from nomotic.interrupt import InterruptScope
 runtime.interrupt_action(action.id, reason="Agent compromised", scope=InterruptScope.AGENT)
 
 # Emergency: interrupt all running actions globally
@@ -136,11 +136,9 @@ runtime.interrupt_action(action.id, reason="System-wide halt", scope=InterruptSc
 The Nomotic Protocol makes agent reasoning visible, structured, and governable. Agents externalize their reasoning as structured artifacts. Governance evaluates the reasoning before action occurs. A signed token proves evaluation took place.
 
 ```python
-from nomotic import (
-    ReasoningArtifact,
-    ProtocolEvaluator,
-    GovernanceToken,
-)
+from nomotic.protocol import ReasoningArtifact
+from nomotic.evaluator import ProtocolEvaluator
+from nomotic.token import GovernanceToken
 
 # Agent produces a structured reasoning artifact
 artifact = ReasoningArtifact(
@@ -434,16 +432,24 @@ Services validate governance through middleware:
 
 ```python
 # FastAPI
-from nomotic.middleware import NomoticFastAPI
+from nomotic.middleware import NomoticGateway, GatewayConfig
+from nomotic.adapters.fastapi_adapter import NomoticMiddleware
 
 app = FastAPI()
-NomoticFastAPI(app, validation_level="local_ca")
+gateway = NomoticGateway(config=GatewayConfig(require_cert=True, min_trust=0.6))
+app.add_middleware(NomoticMiddleware, gateway=gateway)
 
 # Flask
-from nomotic.middleware import NomoticFlask
+from nomotic.middleware import NomoticGateway, GatewayConfig
+from nomotic.adapters.flask_adapter import nomotic_required
 
 app = Flask(__name__)
-NomoticFlask(app, validation_level="headers")
+gateway = NomoticGateway(config=GatewayConfig(require_cert=True, min_trust=0.6))
+
+@app.route("/data")
+@nomotic_required(gateway)
+def get_data():
+    return jsonify(data)
 ```
 
 ### REST API

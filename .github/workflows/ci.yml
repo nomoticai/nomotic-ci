@@ -15,6 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NOMOTIC_BOT_APP_ID }}
+          private-key: ${{ secrets.NOMOTIC_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout nomotic
+        uses: actions/checkout@v4
+        with:
+          repository: nomoticai/nomotic
+          path: nomotic
+          token: ${{ steps.app-token.outputs.token }}
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -23,6 +38,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install -e ./nomotic
           pip install -e ".[dev]"
 
       - name: Run tests with coverage
